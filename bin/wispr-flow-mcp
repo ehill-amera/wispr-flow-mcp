@@ -1,0 +1,10 @@
+#!/bin/sh
+# Starts the server. --offline and --no-sync mean uv never touches the network or the environment here.
+set -eu
+root=$(cd "$(dirname "$0")/.." && pwd)
+uv=""
+for candidate in "$HOME/.local/bin/uv" /opt/homebrew/bin/uv /usr/local/bin/uv; do
+  [ -x "$candidate" ] && { uv=$candidate; break; }
+done
+[ -n "$uv" ] || uv=uv
+exec "$uv" run --quiet --offline --no-sync --directory "$root" wispr-flow-mcp

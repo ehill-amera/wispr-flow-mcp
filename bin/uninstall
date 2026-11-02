@@ -1,0 +1,18 @@
+#!/bin/sh
+# Stops the launchd agents and removes them and their logs. Your archive, backups and config are left alone.
+# Every path used to delete is guarded with ${var:?}, so an empty value stops the script.
+set -eu
+: "${HOME:?}"
+# The WISPR_FLOW_* overrides exist for the tests. "-" rather than ":-" keeps an empty override empty, so the guards fire.
+agents=${WISPR_FLOW_AGENTS_DIR-$HOME/Library/LaunchAgents}
+logs=${WISPR_FLOW_LOGS_DIR-$HOME/Library/Logs/wispr-flow-mcp}
+sync_label=${WISPR_FLOW_SYNC_LABEL-local.wispr-flow-mcp.sync}
+backup_label=${WISPR_FLOW_BACKUP_LABEL-local.wispr-flow-mcp.backup}
+# Checked together first, so an empty value stops everything rather than leaving a half-finished removal.
+: "${agents:?}" "${logs:?}" "${sync_label:?}" "${backup_label:?}"
+domain="gui/$(id -u)"
+launchctl bootout "$domain/$sync_label" 2>/dev/null || true
+launchctl bootout "$domain/$backup_label" 2>/dev/null || true
+rm -f "${agents:?}/${sync_label:?}.plist" "${agents:?}/${backup_label:?}.plist"
+rm -rf "${logs:?}"
+echo "Removed the agents and their logs. Your archive, backups and config were not touched."

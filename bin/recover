@@ -1,0 +1,11 @@
+#!/bin/sh
+# Recovers deleted dictations from a copy of Wispr Flow's database. --offline and --no-sync keep uv off the network.
+set -eu
+: "${HOME:?}"
+root=$(cd "$(dirname "$0")/.." && pwd)
+uv=""
+for candidate in "$HOME/.local/bin/uv" /opt/homebrew/bin/uv /usr/local/bin/uv; do
+  [ -x "$candidate" ] && { uv=$candidate; break; }
+done
+[ -n "$uv" ] || uv=uv
+exec "$uv" run --quiet --offline --no-sync --directory "$root" wispr-flow-recover "$@"

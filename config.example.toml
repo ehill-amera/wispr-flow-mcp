@@ -1,0 +1,9 @@
+# Optional. Copy to: ~/Library/Application Support/wispr-flow-mcp/config.toml
+# With no config file, times use this Mac's timezone and the backup is off.
+
+# Folder that receives a daily backup. Any folder works, including one synced by a cloud storage app.
+# Copies go in a wispr-flow-archive subfolder, and the newest 7 are kept.
+# backup_folder = "/path/to/your/folder"
+
+# Overrides the Mac's timezone.
+# timezone = "Europe/Paris"

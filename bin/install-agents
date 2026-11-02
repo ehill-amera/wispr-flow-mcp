@@ -1,0 +1,55 @@
+#!/bin/sh
+# Installs the launchd agents. Usage: bin/install-agents [--backup-folder "/path/to/folder"]
+# The sync always runs. The daily backup runs only when a backup folder is set, here or in the config file.
+# Every path used to write or delete is guarded with ${var:?}, so an empty value stops the script.
+set -eu
+: "${HOME:?}"
+root=$(cd "$(dirname "$0")/.." && pwd)
+archive="$root/bin/wispr-flow-archive"
+# The WISPR_FLOW_* overrides exist for the tests. "-" rather than ":-" keeps an empty override empty, so the guards fire.
+agents=${WISPR_FLOW_AGENTS_DIR-$HOME/Library/LaunchAgents}
+logs=${WISPR_FLOW_LOGS_DIR-$HOME/Library/Logs/wispr-flow-mcp}
+sync_label=${WISPR_FLOW_SYNC_LABEL-local.wispr-flow-mcp.sync}
+backup_label=${WISPR_FLOW_BACKUP_LABEL-local.wispr-flow-mcp.backup}
+case $# in
+  0) ;;
+  2) [ "$1" = "--backup-folder" ] || { echo "Usage: $0 [--backup-folder /path/to/folder]" >&2; exit 2; }
+     "$archive" set-backup-folder "$2" ;;
+  *) echo "Usage: $0 [--backup-folder /path/to/folder]" >&2; exit 2 ;;
+esac
+domain="gui/$(id -u)"
+mkdir -p "${logs:?}" "${agents:?}"
+
+xml() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+
+write_plist() { # label, subcommand, schedule xml
+  cat > "${agents:?}/${1:?}.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$1</string>
+  <key>ProgramArguments</key>
+  <array><string>$(xml "$archive")</string><string>$2</string></array>
+  $3
+  <key>ProcessType</key><string>Background</string>
+  <key>LowPriorityIO</key><true/>
+  <key>StandardOutPath</key><string>$(xml "$logs/$2.log")</string>
+  <key>StandardErrorPath</key><string>$(xml "$logs/$2.log")</string>
+</dict>
+</plist>
+PLIST
+  plutil -lint -s "$agents/$1.plist"
+  launchctl bootout "$domain/$1" 2>/dev/null || true
+  launchctl bootstrap "$domain" "$agents/$1.plist"
+}
+
+write_plist "${sync_label:?}" sync "<key>StartInterval</key><integer>900</integer><key>RunAtLoad</key><true/>"
+if [ -n "$("$archive" show-backup-folder)" ]; then
+  write_plist "${backup_label:?}" backup "<key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>30</integer></dict>"
+  echo "Installed the sync and the daily backup"
+else
+  launchctl bootout "$domain/$backup_label" 2>/dev/null || true
+  rm -f "${agents:?}/${backup_label:?}.plist"
+  echo "Installed the sync. The daily backup is off."
+fi
